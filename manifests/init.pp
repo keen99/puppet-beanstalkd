@@ -37,7 +37,7 @@ define beanstalkd::config ( # name
       $defaultservicename = 'beanstalkd'
       $user               = 'beanstalkd'
       $configfile         = '/etc/init.d/beanstalkd'
-      $configtemplate     = "${module_name}/ubuntu/beanstalkd.erb"
+      $configtemplate     = "${module_name}/debian/beanstalkd.erb"
       $hasstatus          = 'true'
       $restart            = '/etc/init.d/beanstalkd restart'
       $mode               = 0755
