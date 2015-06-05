@@ -1,3 +1,4 @@
+
 # usage:
 #
 #  beanstalkd::config { name:
@@ -31,14 +32,15 @@ define beanstalkd::config ( # name
 ) {
 
   case $::operatingsystem {
-    ubuntu, debian: {
+    debian, ubuntu: {
       $defaultpackagename = 'beanstalkd'
       $defaultservicename = 'beanstalkd'
       $user               = 'beanstalkd'
-      $configfile         = '/etc/default/beanstalkd'
-      $configtemplate     = "${module_name}/debian/beanstalkd_default.erb"  # please create me!
+      $configfile         = '/etc/init.d/beanstalkd'
+      $configtemplate     = "${module_name}/ubuntu/beanstalkd.erb"
       $hasstatus          = 'true'
       $restart            = '/etc/init.d/beanstalkd restart'
+      $mode               = 0755
     }
     centos, redhat: {
       $defaultpackagename = 'beanstalkd'
@@ -48,6 +50,7 @@ define beanstalkd::config ( # name
       $configtemplate     = "${module_name}/redhat/beanstalkd_sysconfig.erb"
       $hasstatus          = 'true'
       $restart            = '/etc/init.d/beanstalkd restart'
+      $mode               = 0644
     }
     # TODO: add more OS support!
     default: {
@@ -100,24 +103,25 @@ define beanstalkd::config ( # name
     ensure => $ourpackageversion
   }
 
+  file { $configfile:
+    content => template($configtemplate),
+    owner   => 'root',
+    group   => 'root',
+    mode    => $mode,
+    ensure  => $fileensure,
+    require => Package[$ourpackagename],
+  }
+
   service { $ourservicename:
     enable    => $serviceenable,
     ensure    => $serviceensure,
     hasstatus => $hasstatus,
     restart   => $restart,
+    require   => File[$configfile],
     subscribe => [
       Package[$ourpackagename],
       File[$configfile]
     ],
-  }
-
-  file { $configfile:
-    content => template($configtemplate),
-    owner   => 'root',
-    group   => 'root',
-    mode    => 0644,
-    ensure  => $fileensure,
-    require => Package[$ourpackagename],
   }
 
 }
