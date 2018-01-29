@@ -36,11 +36,44 @@ define beanstalkd::config ( # name
       $defaultpackagename = 'beanstalkd'
       $defaultservicename = 'beanstalkd'
       $user               = 'beanstalkd'
-      $configfile         = '/etc/init.d/beanstalkd'
-      $configtemplate     = "${module_name}/debian/beanstalkd.erb"
       $hasstatus          = 'true'
       $restart            = '/etc/init.d/beanstalkd restart'
-      $mode               = '0755'
+
+      case $::operatingsystem {
+        'Debian': {
+          case $::operatingsystemmajrelease {
+            '8': {
+              $configfile          = '/etc/default/beanstalkd'
+              $configtemplate      = "${module_name}/debian/beanstalkd_sysconfig.erb"
+              $mode                = '0644'
+              $servicefile         = '/lib/systemd/system/beanstalkd.service'
+              $servicefiletemplate = "${module_name}/debian/beanstalkd_service.erb"
+            }
+            default: {
+              $configfile          = '/etc/init.d/beanstalkd'
+              $configtemplate      = "${module_name}/debian/beanstalkd.erb"
+              $mode                = '0755'
+              $servicefile         = undef
+              $servicefiletemplate = undef
+            }
+          }
+        }
+        'Ubuntu': {
+          if versioncmp($::operatingsystemmajrelease, '16') >= 0 {
+            $configfile          = '/etc/default/beanstalkd'
+            $configtemplate      = "${module_name}/debian/beanstalkd_sysconfig.erb"
+            $mode                = '0644'
+            $servicefile         = '/lib/systemd/system/beanstalkd.service'
+            $servicefiletemplate = "${module_name}/debian/beanstalkd_service.erb"
+          } else {
+            $configfile          = '/etc/init.d/beanstalkd'
+            $configtemplate      = "${module_name}/debian/beanstalkd.erb"
+            $mode                = '0755'
+            $servicefile         = undef
+            $servicefiletemplate = undef
+          }
+        }
+      }
     }
     centos, redhat: {
       $defaultpackagename = 'beanstalkd'
@@ -107,6 +140,27 @@ define beanstalkd::config ( # name
     mode    => $mode,
     ensure  => $fileensure,
     require => Package[$ourpackagename],
+  }
+
+  if $servicefile {
+    file { $servicefile:
+      content => template($servicefiletemplate),
+      owner   => 'root',
+      group   => 'root',
+      mode    => $mode,
+      ensure  => $fileensure,
+      require => Package[$ourpackagename],
+      notify  => Service[$ourservicename],
+    }
+  }
+
+  if $binlogdir != '' {
+    file { $binlogdir:
+      owner   => $user,
+      group   => 'root',
+      ensure  => 'directory',
+      require => Package[$ourpackagename],
+    }
   }
 
   service { $ourservicename:
