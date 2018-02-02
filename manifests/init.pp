@@ -31,67 +31,7 @@ define beanstalkd::config ( # name
   $servicename    = undef
 ) {
 
-  case $::operatingsystem {
-    debian, ubuntu: {
-      $defaultpackagename = 'beanstalkd'
-      $defaultservicename = 'beanstalkd'
-      $user               = 'beanstalkd'
-      $hasstatus          = 'true'
-      $restart            = '/etc/init.d/beanstalkd restart'
-
-      case $::operatingsystem {
-        'Debian': {
-          case $::operatingsystemmajrelease {
-            '8': {
-              $configfile          = '/etc/default/beanstalkd'
-              $configtemplate      = "${module_name}/debian/beanstalkd_sysconfig.erb"
-              $mode                = '0644'
-              $servicefile         = '/lib/systemd/system/beanstalkd.service'
-              $servicefiletemplate = "${module_name}/debian/beanstalkd_service.erb"
-            }
-            default: {
-              $configfile          = '/etc/init.d/beanstalkd'
-              $configtemplate      = "${module_name}/debian/beanstalkd.erb"
-              $mode                = '0755'
-              $servicefile         = undef
-              $servicefiletemplate = undef
-            }
-          }
-        }
-        'Ubuntu': {
-          if versioncmp($::operatingsystemmajrelease, '16') >= 0 {
-            $configfile          = '/etc/default/beanstalkd'
-            $configtemplate      = "${module_name}/debian/beanstalkd_sysconfig.erb"
-            $mode                = '0644'
-            $servicefile         = '/lib/systemd/system/beanstalkd.service'
-            $servicefiletemplate = "${module_name}/debian/beanstalkd_service.erb"
-          } else {
-            $configfile          = '/etc/init.d/beanstalkd'
-            $configtemplate      = "${module_name}/debian/beanstalkd.erb"
-            $mode                = '0755'
-            $servicefile         = undef
-            $servicefiletemplate = undef
-          }
-        }
-      }
-    }
-    centos, redhat: {
-      $defaultpackagename  = 'beanstalkd'
-      $defaultservicename  = 'beanstalkd'
-      $user                = 'beanstalkd'
-      $configfile          = '/etc/sysconfig/beanstalkd'
-      $configtemplate      = "${module_name}/redhat/beanstalkd_sysconfig.erb"
-      $hasstatus           = 'true'
-      $restart             = '/etc/init.d/beanstalkd restart'
-      $mode                = '0644'
-      $servicefile         = undef
-      $servicefiletemplate = undef
-    }
-    # TODO: add more OS support!
-    default: {
-      fail("ERROR [${module_name}]: I don't know how to manage this OS: ${::operatingsystem}")
-    }
-  }
+  include ::beanstalkd::params
 
   # simply the users experience for running/stopped/absent, and use ensure to cover those bases
   case $ensure {
@@ -118,15 +58,17 @@ define beanstalkd::config ( # name
     }
   }
 
+  $user = $::beanstalkd::params::user
+
   # for service and package name - if we've specified one, use it. else use the default
   if $packagename == undef {
-    $ourpackagename = $defaultpackagename
+    $ourpackagename = $::beanstalkd::params::defaultpackagename
   } else {
     $ourpackagename = $packagename
   }
 
   if $servicename == undef {
-    $ourservicename = $defaultservicename
+    $ourservicename = $::beanstalkd::params::defaultservicename
   } else {
     $ourservicename = $servicename
   }
@@ -135,28 +77,28 @@ define beanstalkd::config ( # name
     ensure => $ourpackageversion
   }
 
-  file { $configfile:
-    content => template($configtemplate),
+  file { $::beanstalkd::params::configfile:
+    content => template($::beanstalkd::params::configtemplate),
     owner   => 'root',
     group   => 'root',
-    mode    => $mode,
+    mode    => $::beanstalkd::params::mode,
     ensure  => $fileensure,
     require => Package[$ourpackagename],
   }
 
-  if $servicefile {
-    file { $servicefile:
-      content => template($servicefiletemplate),
+  if $::beanstalkd::params::servicefile != undef {
+    file { $::beanstalkd::params::servicefile:
+      content => template($::beanstalkd::params::servicefiletemplate),
       owner   => 'root',
       group   => 'root',
-      mode    => $mode,
+      mode    => $::beanstalkd::params::mode,
       ensure  => $fileensure,
       require => Package[$ourpackagename],
-      notify  => Exec['beanstalkd-systemd-reload'],
+      notify  => Exec['beanstalkd-systemd-reloadconfig'],
     }
 
-    exec { 'beanstalkd-systemd-reload':
-      command     => 'systemctl daemon-reload',
+    exec { 'beanstalkd-systemd-reloadconfig':
+      command     => $::beanstalkd::params::reloadconfig,
       path        => '/bin:/usr/bin:/usr/local/bin',
       notify      => Service[$ourservicename],
       refreshonly => true,
@@ -165,7 +107,7 @@ define beanstalkd::config ( # name
 
   if $binlogdir != '' {
     file { $binlogdir:
-      owner   => $user,
+      owner   => $::beanstalkd::params::user,
       group   => 'root',
       ensure  => 'directory',
       require => Package[$ourpackagename],
@@ -175,12 +117,12 @@ define beanstalkd::config ( # name
   service { $ourservicename:
     enable    => $serviceenable,
     ensure    => $serviceensure,
-    hasstatus => $hasstatus,
-    restart   => $restart,
-    require   => File[$configfile],
+    hasstatus => $::beanstalkd::params::hasstatus,
+    restart   => $::beanstalkd::params::restart,
+    require   => File[$::beanstalkd::params::configfile],
     subscribe => [
       Package[$ourpackagename],
-      File[$configfile]
+      File[$::beanstalkd::params::configfile]
     ],
   }
 
