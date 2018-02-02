@@ -76,14 +76,16 @@ define beanstalkd::config ( # name
       }
     }
     centos, redhat: {
-      $defaultpackagename = 'beanstalkd'
-      $defaultservicename = 'beanstalkd'
-      $user               = 'beanstalkd'
-      $configfile         = '/etc/sysconfig/beanstalkd'
-      $configtemplate     = "${module_name}/redhat/beanstalkd_sysconfig.erb"
-      $hasstatus          = 'true'
-      $restart            = '/etc/init.d/beanstalkd restart'
-      $mode               = '0644'
+      $defaultpackagename  = 'beanstalkd'
+      $defaultservicename  = 'beanstalkd'
+      $user                = 'beanstalkd'
+      $configfile          = '/etc/sysconfig/beanstalkd'
+      $configtemplate      = "${module_name}/redhat/beanstalkd_sysconfig.erb"
+      $hasstatus           = 'true'
+      $restart             = '/etc/init.d/beanstalkd restart'
+      $mode                = '0644'
+      $servicefile         = undef
+      $servicefiletemplate = undef
     }
     # TODO: add more OS support!
     default: {
@@ -150,7 +152,14 @@ define beanstalkd::config ( # name
       mode    => $mode,
       ensure  => $fileensure,
       require => Package[$ourpackagename],
-      notify  => Service[$ourservicename],
+      notify  => Exec['beanstalkd-systemd-reload'],
+    }
+
+    exec { 'beanstalkd-systemd-reload':
+      command     => 'systemctl daemon-reload',
+      path        => '/bin:/usr/bin:/usr/local/bin',
+      notify      => Service[$ourservicename],
+      refreshonly => true,
     }
   }
 
